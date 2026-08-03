@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "nexblue-api"
 version = "0.1.0"
 description = "Async client for the NexBlue OpenAPI"
-readme = { text = "Async client for the NexBlue API.", content-type = "text/markdown" }
+readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]

@@ -7,3 +7,12 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Local credentials and certificate material must never be committed.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
