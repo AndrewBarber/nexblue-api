@@ -25,6 +25,10 @@ from .exceptions import (
 from .models import Charger, ChargerStatus
 from .models import TokenBundle
 
+# These codes were verified against the NexBlue OpenAPI stage environment.
+LOGIN_AUTH_ERROR_CODES = frozenset({1501})
+REFRESH_TOKEN_AUTH_ERROR_CODES = frozenset({1502})
+
 CHARGING_CONTROL_RESULT_MESSAGES = {
     1: "The charger is currently unavailable for this operation",
     2: "You don't have permission to control this charger",
@@ -61,6 +65,7 @@ class NexBlueClient:
             "/openapi/account/login",
             json={"username": username, "password": password, "account_type": 0},
             authenticated=False,
+            auth_error_codes=LOGIN_AUTH_ERROR_CODES,
         )
         token = TokenBundle.from_api(payload)
         self._store_token(token, fallback_refresh_token=None)
@@ -76,6 +81,7 @@ class NexBlueClient:
             "/openapi/account/refresh_token",
             json={"refresh_token": token_value, "account_type": 0},
             authenticated=False,
+            auth_error_codes=REFRESH_TOKEN_AUTH_ERROR_CODES,
         )
         token = TokenBundle.from_api(payload)
         self._store_token(token, fallback_refresh_token=token_value)
@@ -135,6 +141,7 @@ class NexBlueClient:
         json: Mapping[str, Any] | None = None,
         authenticated: bool,
         command: bool = False,
+        auth_error_codes: frozenset[int] = frozenset(),
     ) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {self._access_token}"} if authenticated else None
         try:
@@ -149,6 +156,11 @@ class NexBlueClient:
                     raise NexBlueCommandError("The NexBlue API rejected the command format")
                 if response.status >= 400:
                     error_payload = await _async_safe_json(response)
+                    if (
+                        response.status == 400
+                        and error_payload.get("code") in auth_error_codes
+                    ):
+                        raise NexBlueAuthError("Authentication failed")
                     if error_payload.get("code") == 2105:
                         raise NexBlueDeviceOfflineError("NexBlue charger is offline")
                     if command:

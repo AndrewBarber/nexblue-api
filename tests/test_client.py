@@ -6,6 +6,7 @@ from nexblue_api import (
     NexBlueAuthError,
     NexBlueClient,
     NexBlueDeviceOfflineError,
+    NexBlueError,
     NexBlueRateLimitError,
 )
 
@@ -49,6 +50,19 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("secret-password", repr(client.__dict__))
         self.assertEqual(session.calls[0][1], "https://example.test/openapi/account/login")
 
+    async def test_incorrect_login_credentials_http_400_is_an_auth_error(self):
+        """Treat NexBlue's invalid-credentials response as an auth error."""
+        session = Session([
+            Response(400, {"code": 1501, "message": "Incorrect username or password."}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+
+        with self.assertRaisesRegex(NexBlueAuthError, "Authentication failed"):
+            await client.async_login("user@example.test", "wrong-password")
+
+        self.assertEqual(len(session.calls), 1)
+        self.assertEqual(session.calls[0][1], "https://example.test/openapi/account/login")
+
     async def test_refresh_token_sets_bearer_for_status_requests(self):
         session = Session([
             Response(200, {"access_token": "access", "refresh_token": "refresh2", "expires_in": 3600}),
@@ -64,6 +78,29 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(token.refresh_token, "refresh2")
         self.assertEqual(status.power_kw, 7.2)
         self.assertEqual(session.calls[1][2]["headers"], {"Authorization": "Bearer access"})
+
+    async def test_invalid_refresh_token_http_400_is_an_auth_error(self):
+        """Treat NexBlue's invalid-refresh response as session expiry."""
+        session = Session([
+            Response(400, {"code": 1502, "message": "Oauth proxy login error."}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+
+        with self.assertRaisesRegex(NexBlueAuthError, "Authentication failed"):
+            await client.async_refresh_access_token("expired-token-test")
+
+        self.assertEqual(len(session.calls), 1)
+        self.assertEqual(session.calls[0][1], "https://example.test/openapi/account/refresh_token")
+
+    async def test_other_refresh_http_400_remains_generic_error(self):
+        """Do not mistake an unrelated refresh endpoint failure for authentication."""
+        session = Session([
+            Response(400, {"code": 9999, "message": "Unexpected request error"}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+
+        with self.assertRaisesRegex(NexBlueError, "HTTP 400"):
+            await client.async_refresh_access_token("refresh-token")
 
     async def test_unauthorized_request_does_not_retry_in_a_loop(self):
         session = Session([
