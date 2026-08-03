@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
@@ -8,9 +8,16 @@ version = "0.1.0"
 description = "Async client for the NexBlue OpenAPI"
 readme = { text = "Async client for the NexBlue API.", content-type = "text/markdown" }
 requires-python = ">=3.13"
-license = { text = "MIT" }
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "NexBlue" }]
+maintainers = [{ name = "NexBlue" }]
 dependencies = ["aiohttp>=3.10"]
+
+[project.urls]
+Homepage = "https://github.com/NexBlue-AB/nexblue-api"
+Repository = "https://github.com/NexBlue-AB/nexblue-api"
+Issues = "https://github.com/NexBlue-AB/nexblue-api/issues"
 
 [project.optional-dependencies]
 test = []
