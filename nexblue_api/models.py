@@ -1,5 +1,8 @@
 """Stable data models independent of Home Assistant."""
 
+import base64
+import binascii
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -11,13 +14,17 @@ class TokenBundle:
     access_token: str
     refresh_token: str | None
     expires_in: int
+    account_id: str | None = None
 
     @classmethod
     def from_api(cls, payload: dict[str, Any]) -> "TokenBundle":
+        """Create a token bundle and expose the stable Cognito account subject."""
+        access_token = str(payload["access_token"])
         return cls(
-            access_token=str(payload["access_token"]),
+            access_token=access_token,
             refresh_token=payload.get("refresh_token"),
             expires_in=int(payload.get("expires_in", 0)),
+            account_id=_jwt_subject(access_token),
         )
 
 
@@ -100,3 +107,26 @@ def _optional_int(value: Any) -> int | None:
 def _optional_str(value: Any) -> str | None:
     """Return a string when the API included a value."""
     return None if value is None else str(value)
+
+
+def _jwt_subject(access_token: str) -> str | None:
+    """Return the unverified Cognito JWT subject for a stable local account ID.
+
+    The API gateway remains responsible for verifying token signatures. This
+    value is used only as a local, stable identifier by API consumers.
+    """
+    parts = access_token.split(".")
+    if len(parts) != 3:
+        return None
+
+    payload = parts[1]
+    padded_payload = payload + "=" * (-len(payload) % 4)
+    try:
+        claims = json.loads(
+            base64.b64decode(padded_payload, altchars=b"-_", validate=True)
+        )
+    except (binascii.Error, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+
+    subject = claims.get("sub") if isinstance(claims, dict) else None
+    return subject if isinstance(subject, str) and subject else None

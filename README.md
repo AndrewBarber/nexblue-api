@@ -80,6 +80,11 @@ restore a session should persist only the refresh token using their platform's
 protected credential storage, then call `async_refresh_access_token`. Do not persist
 an end-user password merely to perform automatic logins.
 
+Successful login and refresh calls return a `TokenBundle`. Its `account_id` field is
+the stable account subject provided by the access token when available. Applications
+may use this value as a local, non-secret account identifier; they should not derive
+identity from a username or log the access token itself.
+
 This library does not embed NexBlue OAuth client credentials. Applications using an
 external OAuth flow may provide an externally managed access token with
 `set_access_token`.
