@@ -46,7 +46,7 @@ class ChargerStatus:
 
     serial_number: str
     protocol_version: str | None
-    charging_state: str | int
+    charging_state: int
     power_kw: float
     energy_kwh: float
     lifetime_energy_kwh: float
@@ -69,7 +69,7 @@ class ChargerStatus:
         return cls(
             serial_number=serial_number,
             protocol_version=_optional_str(payload.get("protocol_version")),
-            charging_state=payload.get("charging_state"),
+            charging_state=int(payload["charging_state"]),
             power_kw=float(payload.get("power", 0)),
             energy_kwh=float(payload.get("energy", 0)),
             lifetime_energy_kwh=float(payload.get("lifetime_energy", 0)),

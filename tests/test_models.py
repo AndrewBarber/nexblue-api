@@ -3,7 +3,7 @@
 import base64
 import json
 
-from nexblue_api.models import TokenBundle
+from nexblue_api.models import ChargerStatus, TokenBundle
 
 
 def _access_token_with_claims(claims: dict[str, object]) -> str:
@@ -43,3 +43,13 @@ def test_token_bundle_omits_account_id_for_invalid_or_missing_subject() -> None:
 
     assert malformed.account_id is None
     assert missing_subject.account_id is None
+
+
+def test_charger_status_uses_numeric_charging_state() -> None:
+    """Normalize the required charging state to an integer."""
+    status = ChargerStatus.from_api(
+        "NB123456",
+        {"charging_state": 2},
+    )
+
+    assert status.charging_state == 2

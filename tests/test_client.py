@@ -67,7 +67,7 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
         session = Session([
             Response(200, {"access_token": "access", "refresh_token": "refresh2", "expires_in": 3600}),
             Response(200, {"data": [{"serial_number": "NB1"}]}),
-            Response(200, {"charging_state": "charging", "power": 7.2, "lifetime_energy": 11.3, "current_list": [16], "voltage_list": [230]}),
+            Response(200, {"charging_state": 2, "power": 7.2, "lifetime_energy": 11.3, "current_list": [16], "voltage_list": [230]}),
         ])
         client = NexBlueClient(session, "https://example.test")
 
@@ -76,6 +76,7 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
         status = await client.async_get_charger_status(chargers[0].serial_number)
 
         self.assertEqual(token.refresh_token, "refresh2")
+        self.assertEqual(status.charging_state, 2)
         self.assertEqual(status.power_kw, 7.2)
         self.assertEqual(session.calls[1][2]["headers"], {"Authorization": "Bearer access"})
 
