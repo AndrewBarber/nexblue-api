@@ -37,6 +37,10 @@ CHARGING_CONTROL_RESULT_MESSAGES = {
     5: "This charger is currently being controlled by another user",
 }
 
+# Documented range for the set_current_limit command, in amperes.
+MIN_CURRENT_LIMIT_A = 6
+MAX_CURRENT_LIMIT_A = 32
+
 
 class NexBlueClient:
     """Use one API session for a Home Assistant config entry."""
@@ -112,6 +116,26 @@ class NexBlueClient:
     async def async_stop_charging(self, serial_number: str) -> None:
         """Request charging stop; command availability is enforced by the API/device."""
         await self._async_command(serial_number, "stop_charging")
+
+    async def async_set_current_limit(self, serial_number: str, current_limit_a: int) -> None:
+        """Set the charger current limit; only owner and installer roles may do this.
+
+        The charger's effective limit is the lowest of this value, the circuit fuse,
+        the cable rating and any load-balancing allowance.
+        """
+        if not MIN_CURRENT_LIMIT_A <= current_limit_a <= MAX_CURRENT_LIMIT_A:
+            raise ValueError(
+                f"Current limit must be between {MIN_CURRENT_LIMIT_A} and {MAX_CURRENT_LIMIT_A} A"
+            )
+        payload = await self._async_request(
+            "POST",
+            f"/openapi/chargers/{serial_number}/cmd/set_current_limit",
+            json={"current_limit": current_limit_a},
+            authenticated=True,
+            command=True,
+        )
+        if payload.get("result") not in (0, "success"):
+            raise NexBlueCommandError("The charger rejected the current limit")
 
     async def _async_command(self, serial_number: str, command: str) -> None:
         payload = await self._async_request(

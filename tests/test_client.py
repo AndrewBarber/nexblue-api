@@ -5,6 +5,7 @@ import unittest
 from nexblue_api import (
     NexBlueAuthError,
     NexBlueClient,
+    NexBlueCommandError,
     NexBlueDeviceOfflineError,
     NexBlueError,
     NexBlueRateLimitError,
@@ -139,6 +140,40 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.calls[1][0], "POST")
         self.assertTrue(session.calls[1][1].endswith("/openapi/chargers/NB1/cmd/start_charging"))
         self.assertEqual(session.calls[1][2]["json"], {})
+
+    async def test_set_current_limit_uses_documented_endpoint(self):
+        session = Session([
+            Response(200, {"access_token": "access", "refresh_token": "refresh", "expires_in": 3600}),
+            Response(200, {"result": 0}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+        await client.async_refresh_access_token("refresh")
+
+        await client.async_set_current_limit("NB1", 16)
+
+        self.assertEqual(session.calls[1][0], "POST")
+        self.assertTrue(session.calls[1][1].endswith("/openapi/chargers/NB1/cmd/set_current_limit"))
+        self.assertEqual(session.calls[1][2]["json"], {"current_limit": 16})
+
+    async def test_set_current_limit_rejects_out_of_range_values(self):
+        session = Session([])
+        client = NexBlueClient(session, "https://example.test")
+
+        for value in (5, 33):
+            with self.assertRaises(ValueError):
+                await client.async_set_current_limit("NB1", value)
+        self.assertEqual(session.calls, [])
+
+    async def test_set_current_limit_failure_is_command_error(self):
+        session = Session([
+            Response(200, {"access_token": "access", "refresh_token": "refresh", "expires_in": 3600}),
+            Response(200, {"result": 1}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+        await client.async_refresh_access_token("refresh")
+
+        with self.assertRaises(NexBlueCommandError):
+            await client.async_set_current_limit("NB1", 16)
 
     async def test_rejected_command_reports_user_safe_reason(self):
         session = Session([
