@@ -1,6 +1,8 @@
 """Library tests cover token handling and non-sensitive error handling."""
 
+from datetime import UTC, datetime
 import unittest
+from urllib.parse import parse_qs, urlsplit
 
 from nexblue_api import (
     NexBlueAuthError,
@@ -125,6 +127,39 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(NexBlueRateLimitError):
             await client.async_list_chargers()
+
+    async def test_list_sessions_parses_documented_fields(self):
+        session = Session([
+            Response(200, {"access_token": "access", "refresh_token": "refresh", "expires_in": 3600}),
+            Response(200, {"data": [{
+                "start_timestamp": 1782900000,
+                "end_timestamp": 1782910800,
+                "consumption": 21.4,
+                "start_reason": "Remote",
+                "stop_reason": "EVDisconnected",
+                "operator_type": 0,
+            }]}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+        await client.async_refresh_access_token("refresh")
+
+        sessions = await client.async_list_sessions(
+            "NB1",
+            datetime(2026, 6, 1, tzinfo=UTC),
+            datetime(2026, 7, 1, 12, 0, tzinfo=UTC),
+        )
+
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].start_time, datetime.fromtimestamp(1782900000, tz=UTC))
+        self.assertEqual(sessions[0].end_time, datetime.fromtimestamp(1782910800, tz=UTC))
+        self.assertEqual(sessions[0].energy_kwh, 21.4)
+        self.assertEqual(sessions[0].stop_reason, "EVDisconnected")
+        url = urlsplit(session.calls[1][1])
+        self.assertEqual(url.path, "/openapi/sessions/charger/NB1")
+        self.assertEqual(
+            parse_qs(url.query),
+            {"from_date": ["2026-06-01T00:00:00"], "to_date": ["2026-07-01T12:00:00"]},
+        )
 
     async def test_start_command_uses_documented_endpoint(self):
         session = Session([

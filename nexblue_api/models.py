@@ -4,6 +4,7 @@ import base64
 import binascii
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -87,6 +88,37 @@ class ChargerStatus:
             current_a=tuple(float(value) for value in payload.get("current_list", [])),
             voltage_v=tuple(int(value) for value in payload.get("voltage_list", [])),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ChargerSession:
+    """A completed charging session; energy in kWh, times in UTC."""
+
+    start_time: datetime | None
+    end_time: datetime | None
+    energy_kwh: float
+    start_reason: str | None
+    stop_reason: str | None
+
+    @classmethod
+    def from_api(cls, payload: dict[str, Any]) -> "ChargerSession":
+        return cls(
+            start_time=_optional_timestamp(payload.get("start_timestamp")),
+            end_time=_optional_timestamp(payload.get("end_timestamp")),
+            energy_kwh=float(payload.get("consumption") or 0),
+            start_reason=_optional_str(payload.get("start_reason")),
+            stop_reason=_optional_str(payload.get("stop_reason")),
+        )
+
+
+def _optional_timestamp(value: Any) -> datetime | None:
+    """Return a UTC time from a Unix timestamp when the API included one."""
+    if value is None:
+        return None
+    try:
+        return datetime.fromtimestamp(int(value), tz=UTC)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
 
 
 def _optional_bool(value: Any) -> bool | None:
