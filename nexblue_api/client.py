@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 import time
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote, urlencode
 
 try:
     from aiohttp import ClientError
@@ -22,7 +24,7 @@ from .exceptions import (
     NexBlueError,
     NexBlueRateLimitError,
 )
-from .models import Charger, ChargerStatus
+from .models import Charger, ChargerStatus, EnergyConsumption
 from .models import TokenBundle
 
 # These codes were verified against the NexBlue OpenAPI stage environment.
@@ -105,6 +107,30 @@ class NexBlueClient:
         )
         return ChargerStatus.from_api(serial_number, payload)
 
+    async def async_get_energy_consumption(
+        self,
+        serial_number: str,
+        from_date: datetime,
+        to_date: datetime,
+        granularity: str = "hourly",
+    ) -> EnergyConsumption:
+        """Return aggregated energy use between two times; owner and installer only.
+
+        NexBlue aggregates in whole UTC hours or days, so the returned interval is
+        widened to the granularity boundaries. The API allows at most 60 days.
+        """
+        query = urlencode(
+            {
+                "from_date": _api_datetime(from_date),
+                "to_date": _api_datetime(to_date),
+                "granularity": granularity,
+            }
+        )
+        payload = await self._async_authenticated_request(
+            "GET", f"/openapi/measurement/chargers/{quote(serial_number)}?{query}"
+        )
+        return EnergyConsumption.from_api(payload)
+
     async def async_start_charging(self, serial_number: str) -> None:
         """Request charging start; command availability is enforced by the API/device."""
         await self._async_command(serial_number, "start_charging")
@@ -180,6 +206,13 @@ class NexBlueClient:
         self._refresh_token = token.refresh_token or fallback_refresh_token
         expires_in = max(token.expires_in - 60, 0)
         self._access_token_expires_at = time.monotonic() + expires_in
+
+
+def _api_datetime(value: datetime) -> str:
+    """Format a time as the UTC ISO 8601 string the API expects; naive means UTC."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 async def _async_safe_json(response: Any) -> dict[str, Any]:

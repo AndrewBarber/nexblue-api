@@ -62,6 +62,7 @@ asyncio.run(main())
 - Charger discovery
 - Charger status and telemetry retrieval
 - Start charging and stop charging commands
+- Aggregated energy consumption (owner and installer accounts)
 - Typed charger, status, and token models
 - Safe exceptions for authentication, connection, rate-limit, offline-device, and
   rejected-command errors

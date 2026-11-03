@@ -9,11 +9,12 @@ from .exceptions import (
     NexBlueError,
     NexBlueRateLimitError,
 )
-from .models import Charger, ChargerStatus, TokenBundle
+from .models import Charger, ChargerStatus, EnergyConsumption, TokenBundle
 
 __all__ = [
     "Charger",
     "ChargerStatus",
+    "EnergyConsumption",
     "NexBlueAuthError",
     "NexBlueCommandError",
     "NexBlueClient",

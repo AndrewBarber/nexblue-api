@@ -1,6 +1,8 @@
 """Library tests cover token handling and non-sensitive error handling."""
 
+from datetime import UTC, datetime, timedelta, timezone
 import unittest
+from urllib.parse import parse_qs, urlsplit
 
 from nexblue_api import (
     NexBlueAuthError,
@@ -125,6 +127,34 @@ class NexBlueClientTest(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(NexBlueRateLimitError):
             await client.async_list_chargers()
+
+    async def test_energy_consumption_queries_utc_interval(self):
+        session = Session([
+            Response(200, {"access_token": "access", "refresh_token": "refresh", "expires_in": 3600}),
+            Response(200, {"data": [], "granularity": "hourly", "total": 12.5}),
+        ])
+        client = NexBlueClient(session, "https://example.test")
+        await client.async_refresh_access_token("refresh")
+        local = timezone(timedelta(hours=1))
+
+        energy = await client.async_get_energy_consumption(
+            "NB1",
+            datetime(2026, 7, 1, 0, 0, tzinfo=local),
+            datetime(2026, 7, 1, 12, 30, tzinfo=UTC),
+        )
+
+        self.assertEqual(energy.total_kwh, 12.5)
+        self.assertEqual(energy.granularity, "hourly")
+        url = urlsplit(session.calls[1][1])
+        self.assertEqual(url.path, "/openapi/measurement/chargers/NB1")
+        self.assertEqual(
+            parse_qs(url.query),
+            {
+                "from_date": ["2026-06-30T23:00:00"],
+                "to_date": ["2026-07-01T12:30:00"],
+                "granularity": ["hourly"],
+            },
+        )
 
     async def test_start_command_uses_documented_endpoint(self):
         session = Session([

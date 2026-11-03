@@ -89,6 +89,21 @@ class ChargerStatus:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class EnergyConsumption:
+    """Aggregated charger energy use for a requested interval, in kWh."""
+
+    total_kwh: float
+    granularity: str | None
+
+    @classmethod
+    def from_api(cls, payload: dict[str, Any]) -> "EnergyConsumption":
+        return cls(
+            total_kwh=float(payload.get("total") or 0),
+            granularity=_optional_str(payload.get("granularity")),
+        )
+
+
 def _optional_bool(value: Any) -> bool | None:
     """Return a bool when the API included one."""
     return value if isinstance(value, bool) else None
